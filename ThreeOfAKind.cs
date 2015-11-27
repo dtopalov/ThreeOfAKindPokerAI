@@ -57,7 +57,7 @@
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
             // to rework
-            var playHand = PreflopHandStrengthValuation.GetDesicion(this.FirstCard, this.SecondCard);
+            var playHand = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
             if (playHand == CardValuationType.Unplayable)
             {
                 if (context.CanCheck)
