@@ -11,8 +11,6 @@
 
     using Stages;
 
-    using TexasHoldem.AI.SmartPlayer;
-
     // TODO: HQC
     public class ThreeOfAKind : BasePlayer
     {
@@ -29,12 +27,12 @@
                 return this.PreflopLogic(context);
             }
 
-            return PlayerAction.CheckOrCall();
-
             if (context.RoundType == GameRoundType.Flop)
             {
                 return this.FlopLogic(context);
             }
+
+            return PlayerAction.CheckOrCall();
 
             if (context.RoundType == GameRoundType.Turn)
             {
@@ -56,13 +54,29 @@
 
         private PlayerAction TurnLogic(GetTurnContext context)
         {
-            var outs = this.CountOuts(this.FirstCard, this.SecondCard, this.CommunityCards);
             throw new NotImplementedException();
         }
 
         private PlayerAction FlopLogic(GetTurnContext context)
         {
-            throw new NotImplementedException();
+            var hand = this.CommunityCards.ToList();
+            hand.Add(this.FirstCard);
+            hand.Add(this.SecondCard);
+
+            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+
+            int outs = 0;
+            if ((int)currentHandRank < 3500)
+            {
+                outs = this.CountOuts(hand);
+            }
+
+            if (outs > 10)
+            {
+                return PlayerAction.Raise(context.MoneyLeft);
+            }
+
+            return PlayerAction.CheckOrCall();
         }
 
         private PlayerAction PreflopLogic(GetTurnContext context)
@@ -136,15 +150,27 @@
             return PlayerAction.CheckOrCall();
         }
 
-        private int CountOuts(Card firstCard, Card secondCard, IReadOnlyCollection<Card> communityCards)
+        private int CountOuts(ICollection<Card> hand)
         {
-            var hand = communityCards.ToList();
-            hand.Add(firstCard);
-            hand.Add(secondCard);
+            var outs = 0;
+            foreach (var card in Deck.AllCards)
+            {
+                if (hand.Contains(card))
+                {
+                    continue;
+                }
 
-            HandRankType currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+                hand.Add(card);
 
-            return 0;
+                if ((int)this.handEvaluator.GetBestHand(hand).RankType > 3500)
+                {
+                    outs++;
+                }
+
+                hand.Remove(card);
+            }
+
+            return outs;
         }
     }
 }

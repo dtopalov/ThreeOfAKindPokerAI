@@ -1,6 +1,5 @@
 ﻿namespace TexasHoldem.AI.ThreeOfAKind.Stages
 {
-    using TexasHoldem.AI.SmartPlayer;
     using TexasHoldem.Logic.Cards;
 
     public static class PreflopHandStrengthValuation
