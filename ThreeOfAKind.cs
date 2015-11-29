@@ -15,12 +15,18 @@
     public class ThreeOfAKind : BasePlayer
     {
         private static bool isSmallBlind;
-        private IHandEvaluator handEvaluator = new HandEvaluator();
+        private static int outs = 0;
+        private readonly IHandEvaluator handEvaluator = new HandEvaluator();
 
         public override string Name { get; } = "3ofAKind" + Guid.NewGuid();
 
         public override PlayerAction GetTurn(GetTurnContext context)
         {
+            if (context.MoneyLeft == 0)
+            {
+                return PlayerAction.CheckOrCall();
+            }
+
             // TODO: Some better way to access stages
             if (context.RoundType == GameRoundType.PreFlop)
             {
@@ -54,9 +60,20 @@
             var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
 
             // TODO: add handrank
-            if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+            if (context.PreviousRoundActions.Any()
+                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
             {
-                return PlayerAction.CheckOrCall();
+                if ((int)currentHandRank > 3500)
+                {
+                    return PlayerAction.Raise(context.CurrentPot);
+                }
+
+                if ((int)currentHandRank > 1500)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
+
+                return PlayerAction.Fold();
             }
 
             if ((int)currentHandRank > 1001)
@@ -75,20 +92,26 @@
 
             var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
 
-            if ((int)currentHandRank > 1001)
+            if ((int)currentHandRank > 1500)
             {
-                return PlayerAction.Raise(context.CurrentPot);
+                if (context.PreviousRoundActions.Any()
+                    && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                {
+                    return PlayerAction.Raise(context.CurrentPot);
+                }
+
+                return PlayerAction.CheckOrCall();
             }
 
-            int outs = 0;
-            if ((int)currentHandRank < 2500)
+            if ((int)currentHandRank < 3500)
             {
-                outs = this.CountOuts(hand);
+                outs = this.CountOuts(hand, 2500);
             }
 
             if (outs > 11)
             {
-                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                if (context.PreviousRoundActions.Any()
+                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -96,9 +119,13 @@
                 return PlayerAction.Raise((context.CurrentPot * 2) / 3);
             }
 
-            if (outs < 8 && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+            if (outs < 8)
             {
-                return PlayerAction.Fold();
+                if (context.PreviousRoundActions.Any()
+                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                {
+                    return PlayerAction.Fold();
+                }
             }
 
             return PlayerAction.CheckOrCall();
@@ -112,29 +139,50 @@
 
             var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
 
-            if ((int)currentHandRank > 1001)
+            if ((int)currentHandRank > 1500)
             {
-                return PlayerAction.Raise(context.CurrentPot);
+                if (context.PreviousRoundActions.Any()
+                    && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                {
+                    return PlayerAction.Raise(context.CurrentPot);
+                }
+
+                return PlayerAction.CheckOrCall();
             }
 
-            int outs = 0;
-            if ((int)currentHandRank < 3500)
+            if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = this.CountOuts(hand);
+                outs = this.CountOuts(hand, 2500);
+            }
+            else if ((int)currentHandRank < 3500)
+            {
+                outs = this.CountOuts(hand, 3500);
             }
 
-            if (outs > 11)
+            if (outs > 12)
             {
                 return PlayerAction.Raise(context.CurrentPot * 2);
             }
 
             if (outs > 8)
             {
+                if (context.PreviousRoundActions.Any()
+                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
+
                 return PlayerAction.Raise(context.CurrentPot);
             }
 
-            if (outs > 5)
+            if (outs < 5)
             {
+                if (context.PreviousRoundActions.Any()
+                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                {
+                    return PlayerAction.Fold();
+                }
+
                 return PlayerAction.CheckOrCall();
             }
 
@@ -143,11 +191,6 @@
 
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
-            if (context.MoneyLeft == 0)
-            {
-                return PlayerAction.CheckOrCall();
-            }
-
             // to rework ... or not
             var playHand = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
 
@@ -249,7 +292,7 @@
                 {
                     if (playHand == CardValuationType.Recommended)
                     {
-                        return PlayerAction.Raise(Math.Min((context.CurrentPot + 2 * context.MoneyToCall), context.MoneyLeft));
+                        return PlayerAction.Raise(Math.Min(context.CurrentPot + (2 * context.MoneyToCall), context.MoneyLeft));
                     }
 
                     if (playHand == CardValuationType.Risky)
@@ -267,7 +310,7 @@
             return PlayerAction.CheckOrCall();
         }
 
-        private int CountOuts(ICollection<Card> hand)
+        private int CountOuts(ICollection<Card> hand, int target)
         {
             var outs = 0;
             foreach (var card in Deck.AllCards)
@@ -279,7 +322,7 @@
 
                 hand.Add(card);
 
-                if ((int)this.handEvaluator.GetBestHand(hand).RankType > 3500)
+                if ((int)this.handEvaluator.GetBestHand(hand).RankType > target)
                 {
                     outs++;
                 }
