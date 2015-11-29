@@ -1,4 +1,4 @@
-﻿namespace TexasHoldem.AI.SmartPlayer
+﻿namespace TexasHoldem.AI.ThreeOfAKind
 {
     public enum CardValuationType
     {

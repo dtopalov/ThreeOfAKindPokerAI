@@ -32,8 +32,6 @@
                 return this.FlopLogic(context);
             }
 
-            return PlayerAction.CheckOrCall();
-
             if (context.RoundType == GameRoundType.Turn)
             {
                 return this.TurnLogic(context);
@@ -49,12 +47,61 @@
 
         private PlayerAction RiverLogic(GetTurnContext context)
         {
-            throw new NotImplementedException();
+            var hand = this.CommunityCards.ToList();
+            hand.Add(this.FirstCard);
+            hand.Add(this.SecondCard);
+
+            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+
+            // TODO: add handrank
+            if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+            {
+                return PlayerAction.CheckOrCall();
+            }
+
+            if ((int)currentHandRank > 1001)
+            {
+                return PlayerAction.Raise(context.CurrentPot);
+            }
+
+            return PlayerAction.CheckOrCall();
         }
 
         private PlayerAction TurnLogic(GetTurnContext context)
         {
-            throw new NotImplementedException();
+            var hand = this.CommunityCards.ToList();
+            hand.Add(this.FirstCard);
+            hand.Add(this.SecondCard);
+
+            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+
+            if ((int)currentHandRank > 1001)
+            {
+                return PlayerAction.Raise(context.CurrentPot);
+            }
+
+            int outs = 0;
+            if ((int)currentHandRank < 2500)
+            {
+                outs = this.CountOuts(hand);
+            }
+
+            if (outs > 11)
+            {
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
+
+                return PlayerAction.Raise((context.CurrentPot * 2) / 3);
+            }
+
+            if (outs < 8 && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+            {
+                return PlayerAction.Fold();
+            }
+
+            return PlayerAction.CheckOrCall();
         }
 
         private PlayerAction FlopLogic(GetTurnContext context)
@@ -65,15 +112,30 @@
 
             var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
 
+            if ((int)currentHandRank > 1001)
+            {
+                return PlayerAction.Raise(context.CurrentPot);
+            }
+
             int outs = 0;
             if ((int)currentHandRank < 3500)
             {
                 outs = this.CountOuts(hand);
             }
 
-            if (outs > 10)
+            if (outs > 11)
             {
-                return PlayerAction.Raise(context.MoneyLeft);
+                return PlayerAction.Raise(context.CurrentPot * 2);
+            }
+
+            if (outs > 8)
+            {
+                return PlayerAction.Raise(context.CurrentPot);
+            }
+
+            if (outs > 5)
+            {
+                return PlayerAction.CheckOrCall();
             }
 
             return PlayerAction.CheckOrCall();
@@ -144,6 +206,61 @@
                 if (isSmallBlind && context.MoneyToCall > context.MoneyLeft * 0.2)
                 {
                     return PlayerAction.Fold();
+                }
+            }
+
+            if (!isSmallBlind && context.PreviousRoundActions.Count >= 3)
+            {
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+                    && playHand == CardValuationType.NotRecommended)
+                {
+                    return PlayerAction.Fold();
+                }
+
+                if (context.PreviousRoundActions.Count > 3 && playHand == CardValuationType.Risky)
+                {
+                    if (context.MoneyToCall > context.MoneyLeft * 0.2)
+                    {
+                        return PlayerAction.Fold();
+                    }
+
+                    return PlayerAction.CheckOrCall();
+                }
+
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.CheckCall)
+                {
+                    if (playHand == CardValuationType.Recommended)
+                    {
+                        return PlayerAction.Raise(8 * context.SmallBlind);
+                    }
+
+                    if (playHand == CardValuationType.Risky)
+                    {
+                        return PlayerAction.Raise(6 * context.SmallBlind);
+                    }
+
+                    if (playHand == CardValuationType.NotRecommended)
+                    {
+                        return PlayerAction.CheckOrCall();
+                    }
+                }
+
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise && playHand != CardValuationType.NotRecommended)
+                {
+                    if (playHand == CardValuationType.Recommended)
+                    {
+                        return PlayerAction.Raise(Math.Min((context.CurrentPot + 2 * context.MoneyToCall), context.MoneyLeft));
+                    }
+
+                    if (playHand == CardValuationType.Risky)
+                    {
+                        if (context.MoneyToCall > context.MoneyLeft * 0.2)
+                        {
+                            return PlayerAction.Fold();
+                        }
+
+                        return PlayerAction.CheckOrCall();
+                    }
                 }
             }
 
