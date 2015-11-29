@@ -8,8 +8,8 @@
     <ProjectGuid>{32189EE4-2E81-48A2-8017-4F121A186A78}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>TexasHoldem.AI.SmartPlayer</RootNamespace>
-    <AssemblyName>TexasHoldem.AI.SmartPlayer</AssemblyName>
+    <RootNamespace>TexasHoldem.AI.ThreeOfAKind</RootNamespace>
+    <AssemblyName>TexasHoldem.AI.ThreeOfAKind</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>

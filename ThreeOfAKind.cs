@@ -1,16 +1,24 @@
-﻿namespace TexasHoldem.AI.SmartPlayer
+﻿namespace TexasHoldem.AI.ThreeOfAKind
 {
     using System;
-
+    using System.Collections.Generic;
+    using System.Linq;
     using Logic;
+    using Logic.Cards;
     using Logic.Extensions;
+    using Logic.Helpers;
     using Logic.Players;
 
     using Stages;
 
+    using TexasHoldem.AI.SmartPlayer;
+
     // TODO: HQC
     public class ThreeOfAKind : BasePlayer
     {
+        private static bool isSmallBlind;
+        private IHandEvaluator handEvaluator = new HandEvaluator();
+
         public override string Name { get; } = "3ofAKind" + Guid.NewGuid();
 
         public override PlayerAction GetTurn(GetTurnContext context)
@@ -20,6 +28,8 @@
             {
                 return this.PreflopLogic(context);
             }
+
+            return PlayerAction.CheckOrCall();
 
             if (context.RoundType == GameRoundType.Flop)
             {
@@ -46,6 +56,7 @@
 
         private PlayerAction TurnLogic(GetTurnContext context)
         {
+            var outs = this.CountOuts(this.FirstCard, this.SecondCard, this.CommunityCards);
             throw new NotImplementedException();
         }
 
@@ -56,30 +67,84 @@
 
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
-            // to rework
-            var playHand = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
-            if (playHand == CardValuationType.Unplayable)
+            if (context.MoneyLeft == 0)
             {
-                if (context.CanCheck)
+                return PlayerAction.CheckOrCall();
+            }
+
+            // to rework ... or not
+            var playHand = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
+
+            if (context.MoneyLeft <= context.SmallBlind * 10)
+            {
+                return PlayerAction.Raise(context.MoneyLeft);
+            }
+
+            if (context.PreviousRoundActions.Count == 2)
+            {
+                isSmallBlind = true;
+                if (playHand == CardValuationType.Unplayable)
+                {
+                    return PlayerAction.Fold();
+                }
+
+                if (playHand == CardValuationType.Recommended)
+                {
+                    return PlayerAction.Raise(8 * context.SmallBlind);
+                }
+
+                if (playHand == CardValuationType.Risky)
+                {
+                    return PlayerAction.Raise(6 * context.SmallBlind);
+                }
+
+                if (playHand == CardValuationType.NotRecommended)
+                {
+                    return PlayerAction.Raise(4 * context.SmallBlind);
+                }
+            }
+
+            // Facing a raise
+            if (isSmallBlind && context.PreviousRoundActions.Count > 2)
+            {
+                if (playHand == CardValuationType.NotRecommended)
+                {
+                    return PlayerAction.Fold();
+                }
+
+                if (context.MoneyLeft <= context.SmallBlind * 20)
+                {
+                    return PlayerAction.Raise(context.MoneyLeft);
+                }
+
+                if (playHand == CardValuationType.Recommended)
+                {
+                    return PlayerAction.Raise(Math.Min((2 * context.MoneyToCall) + context.CurrentPot, context.MoneyLeft));
+                }
+
+                if (isSmallBlind && context.MoneyToCall <= context.MoneyLeft * 0.2)
                 {
                     return PlayerAction.CheckOrCall();
                 }
-                return PlayerAction.Fold();
-            }
 
-            if (playHand == CardValuationType.Risky)
-            {
-                var smallBlindsTimes = RandomProvider.Next(1, 8);
-                return PlayerAction.Raise(context.SmallBlind * smallBlindsTimes);
-            }
-
-            if (playHand == CardValuationType.Recommended)
-            {
-                var smallBlindsTimes = RandomProvider.Next(6, 14);
-                return PlayerAction.Raise(context.SmallBlind * smallBlindsTimes);
+                if (isSmallBlind && context.MoneyToCall > context.MoneyLeft * 0.2)
+                {
+                    return PlayerAction.Fold();
+                }
             }
 
             return PlayerAction.CheckOrCall();
+        }
+
+        private int CountOuts(Card firstCard, Card secondCard, IReadOnlyCollection<Card> communityCards)
+        {
+            var hand = communityCards.ToList();
+            hand.Add(firstCard);
+            hand.Add(secondCard);
+
+            HandRankType currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+
+            return 0;
         }
     }
 }
