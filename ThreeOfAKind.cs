@@ -56,7 +56,7 @@
             {
                 flag = true;
                 isCallingStation = this.FindCallingStation(this.opponentActions) &&
-                    context.PreviousRoundActions.Any() && 
+                    context.PreviousRoundActions.Any() &&
                     !context.PreviousRoundActions.Last().PlayerName.Contains("Smokin");
 
                 isVeryAggressive = this.FindAggressiveStation(this.opponentActions);
@@ -129,20 +129,23 @@
                 return PlayerAction.Raise(context.CurrentPot * 2);
             }
 
-            //if (isVeryAggressive && context.PreviousRoundActions.Any() && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
-            //{
-            //    if (this.FirstCard.Type >= CardType.King || this.SecondCard.Type >= CardType.King)
-            //    {
-            //        return PlayerAction.CheckOrCall();
-            //    }
+            if (isVeryAggressive && context.PreviousRoundActions.Any() &&
+                context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+                && context.MoneyToCall <= (context.CurrentPot * 1 / 2 + 1)
+                && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+            {
+                if (this.FirstCard.Type >= CardType.Queen || this.SecondCard.Type >= CardType.Queen)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
 
-            //    if (this.currentHandRank >= HandRankType.Straight)
-            //    {
-            //        return PlayerAction.Raise(context.MoneyLeft);
-            //    }
-            //}
+                if (this.currentHandRank >= HandRankType.Straight)
+                {
+                    return PlayerAction.Raise(context.MoneyLeft);
+                }
+            }
 
-            if (isSmallBlind && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+            if (context.CanCheck && !isCallingStation)
             {
                 return PlayerAction.Raise((context.CurrentPot / 2) + 1);
             }
@@ -161,7 +164,7 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (!isCallingStation && context.MoneyToCall <= context.CurrentPot/2 && this.currentHandRank >= HandRankType.Pair)
+                if (!isCallingStation && context.MoneyToCall <= context.CurrentPot / 2 && this.currentHandRank >= HandRankType.Pair)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -191,7 +194,7 @@
         private bool FindAggressiveStation(ICollection<PlayerActionType> actions)
         {
             int raises = actions.Count(x => x == PlayerActionType.Raise);
-            if (raises * 100 / actions.Count > 50)
+            if (raises * 100 / actions.Count > 70)
             {
                 return true;
             }
@@ -234,6 +237,11 @@
                 {
                     if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2)
                     {
+                        if (isVeryAggressive && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+                        {
+                            return PlayerAction.Raise(context.MoneyLeft);
+                        }
+
                         return PlayerAction.CheckOrCall();
                     }
 
@@ -243,18 +251,11 @@
                 return PlayerAction.Raise((context.CurrentPot * 2) / 3);
             }
 
-            //if (isVeryAggressive)
-            //{
-            //    if (outs > 11)
-            //    {
-            //        return PlayerAction.Raise(context.CurrentPot * 2);
-            //    }
-
-            //    if (this.currentHandRank >= HandRankType.Pair)
-            //    {
-            //        return PlayerAction.CheckOrCall();
-            //    }
-            //}
+            if (!context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall") && isVeryAggressive && this.currentHandRank == HandRankType.Pair &&
+                context.MoneyToCall <= context.CurrentPot * 2 / 3)
+            {
+                return PlayerAction.CheckOrCall();
+            }
 
             if (outs < 8)
             {
@@ -275,7 +276,20 @@
                 return PlayerAction.Raise(context.CurrentPot * 2);
             }
 
-            if (this.currentHandRank > HandRankType.Pair)
+            if (isVeryAggressive)
+            {
+                if (this.currentHandRank >= HandRankType.TwoPairs)
+                {
+                    return PlayerAction.Raise(context.MoneyToCall * 2);
+                }
+
+                if (context.MoneyToCall <= context.CurrentPot && this.currentHandRank >= HandRankType.Pair)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
+            }
+
+            if (this.currentHandRank > HandRankType.TwoPairs)
             {
                 if (context.PreviousRoundActions.Any()
                     && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
@@ -300,35 +314,37 @@
                 outs = this.CountOuts(this.hand, HandRankType.Straight);
             }
 
-            //if (isVeryAggressive && context.PreviousRoundActions.Any() 
-            //    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
-            //{
-            //    if (outs >= 7)
-            //    {
-            //        return PlayerAction.Raise(context.MoneyLeft);
-            //    }
-            //}
+            if (isVeryAggressive && context.PreviousRoundActions.Any()
+                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+                && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+            {
+                if (outs >= 8)
+                {
+                    return PlayerAction.Raise(context.MoneyLeft);
+                }
+            }
 
             if (outs > 11)
             {
-                return PlayerAction.Raise(context.CurrentPot * 2);
+                return PlayerAction.Raise(context.CurrentPot);
             }
 
             if (outs > 8)
             {
                 if (context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise
+                && context.MoneyToCall * 100 / context.CurrentPot < outs * 5)
                 {
                     return PlayerAction.CheckOrCall();
                 }
 
-                return PlayerAction.Raise(context.CurrentPot);
+                return PlayerAction.Raise(context.CurrentPot * 2 / 3);
             }
 
             if (outs < 6)
             {
                 if (context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
                 {
                     return PlayerAction.Fold();
                 }
