@@ -3,9 +3,9 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+
     using Logic;
     using Logic.Cards;
-    using Logic.Extensions;
     using Logic.Helpers;
     using Logic.Players;
 
@@ -16,15 +16,44 @@
     {
         private static bool isSmallBlind;
         private static int outs = 0;
+        private static int currentBlinds = 0;
         private readonly IHandEvaluator handEvaluator = new HandEvaluator();
+        private HandRankType currentHandRank;
+        private ICollection<Card> hand; 
 
         public override string Name { get; } = "3ofAKind" + Guid.NewGuid();
 
         public override PlayerAction GetTurn(GetTurnContext context)
         {
+            currentBlinds = context.SmallBlind * 2;
+
+            // antiCrash prefix - do not delete
             if (context.MoneyLeft == 0)
             {
                 return PlayerAction.CheckOrCall();
+            }
+
+            // get current Rank
+            if (context.RoundType != GameRoundType.PreFlop)
+            {
+                this.currentHandRank = this.GetCurrentHandRank();
+            }
+
+            // fishing prefix - nais :)
+            if (/*context.PreviousRoundActions.Any()
+                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+                && context.MoneyToCall > 0
+                &&*/ context.MoneyToCall < 12)
+            {
+                if (context.RoundType != GameRoundType.River)
+                {
+                    return PlayerAction.CheckOrCall();
+                }
+
+                if (this.currentHandRank >= HandRankType.Flush)
+                {
+                    return PlayerAction.Raise(context.MoneyLeft);
+                }
             }
 
             // TODO: Some better way to access stages
@@ -51,24 +80,29 @@
             return PlayerAction.CheckOrCall();
         }
 
+        private HandRankType GetCurrentHandRank()
+        {
+            this.hand = this.CommunityCards.ToList();
+            this.hand.Add(this.FirstCard);
+            this.hand.Add(this.SecondCard);
+
+            return this.handEvaluator.GetBestHand(this.hand).RankType;
+        }
+
         private PlayerAction RiverLogic(GetTurnContext context)
         {
-            var hand = this.CommunityCards.ToList();
-            hand.Add(this.FirstCard);
-            hand.Add(this.SecondCard);
-
-            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
+            this.currentHandRank = this.handEvaluator.GetBestHand(this.hand).RankType;
 
             // TODO: add handrank
             if (context.PreviousRoundActions.Any()
                     && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
             {
-                if ((int)currentHandRank > 3500)
+                if (this.currentHandRank >= HandRankType.Straight)
                 {
                     return PlayerAction.Raise(context.CurrentPot);
                 }
 
-                if ((int)currentHandRank > 1500)
+                if (this.currentHandRank > HandRankType.TwoPairs)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -76,7 +110,7 @@
                 return PlayerAction.Fold();
             }
 
-            if ((int)currentHandRank > 1001)
+            if (this.currentHandRank > HandRankType.TwoPairs)
             {
                 return PlayerAction.Raise(context.CurrentPot);
             }
@@ -86,13 +120,7 @@
 
         private PlayerAction TurnLogic(GetTurnContext context)
         {
-            var hand = this.CommunityCards.ToList();
-            hand.Add(this.FirstCard);
-            hand.Add(this.SecondCard);
-
-            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
-
-            if ((int)currentHandRank > 1500)
+            if (this.currentHandRank > HandRankType.TwoPairs)
             {
                 if (context.PreviousRoundActions.Any()
                     && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
@@ -103,9 +131,9 @@
                 return PlayerAction.CheckOrCall();
             }
 
-            if ((int)currentHandRank < 3500)
+            if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(hand, 2500);
+                outs = this.CountOuts(this.hand, HandRankType.Straight);
             }
 
             if (outs > 11)
@@ -133,13 +161,7 @@
 
         private PlayerAction FlopLogic(GetTurnContext context)
         {
-            var hand = this.CommunityCards.ToList();
-            hand.Add(this.FirstCard);
-            hand.Add(this.SecondCard);
-
-            var currentHandRank = this.handEvaluator.GetBestHand(hand).RankType;
-
-            if ((int)currentHandRank > 1500)
+            if (this.currentHandRank > HandRankType.Pair)
             {
                 if (context.PreviousRoundActions.Any()
                     && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
@@ -152,14 +174,14 @@
 
             if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = this.CountOuts(hand, 2500);
+                outs = this.CountOuts(this.hand, HandRankType.ThreeOfAKind);
             }
-            else if ((int)currentHandRank < 3500)
+            else if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(hand, 3500);
+                outs = this.CountOuts(this.hand, HandRankType.Straight);
             }
 
-            if (outs > 12)
+            if (outs > 11)
             {
                 return PlayerAction.Raise(context.CurrentPot * 2);
             }
@@ -175,7 +197,7 @@
                 return PlayerAction.Raise(context.CurrentPot);
             }
 
-            if (outs < 5)
+            if (outs < 6)
             {
                 if (context.PreviousRoundActions.Any()
                 && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
@@ -194,7 +216,7 @@
             // to rework ... or not
             var playHand = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
 
-            if (context.MoneyLeft <= context.SmallBlind * 10)
+            if (context.MoneyLeft <= context.SmallBlind * 10 && playHand > CardValuationType.Unplayable)
             {
                 return PlayerAction.Raise(context.MoneyLeft);
             }
@@ -205,6 +227,11 @@
                 if (playHand == CardValuationType.Unplayable)
                 {
                     return PlayerAction.Fold();
+                }
+
+                if (playHand == CardValuationType.Monster)
+                {
+                    PlayerAction.Raise(context.CurrentPot * 5);
                 }
 
                 if (playHand == CardValuationType.Recommended)
@@ -254,17 +281,22 @@
 
             if (!isSmallBlind && context.PreviousRoundActions.Count >= 3)
             {
-                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
-                    && playHand == CardValuationType.NotRecommended)
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
                 {
-                    return PlayerAction.Fold();
-                }
-
-                if (context.PreviousRoundActions.Count > 3 && playHand == CardValuationType.Risky)
-                {
-                    if (context.MoneyToCall > context.MoneyLeft * 0.2)
+                    if (playHand == CardValuationType.NotRecommended)
                     {
                         return PlayerAction.Fold();
+                    }
+                }
+
+                if (context.PreviousRoundActions.Count > 3)
+                {
+                    if (playHand == CardValuationType.Risky)
+                    {
+                        if (context.MoneyToCall > context.MoneyLeft * 0.2)
+                        {
+                            return PlayerAction.Fold();
+                        }
                     }
 
                     return PlayerAction.CheckOrCall();
@@ -288,7 +320,8 @@
                     }
                 }
 
-                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise && playHand != CardValuationType.NotRecommended)
+                if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+                    && playHand != CardValuationType.NotRecommended)
                 {
                     if (playHand == CardValuationType.Recommended)
                     {
@@ -310,27 +343,27 @@
             return PlayerAction.CheckOrCall();
         }
 
-        private int CountOuts(ICollection<Card> hand, int target)
+        private int CountOuts(ICollection<Card> currentHand, HandRankType target)
         {
-            var outs = 0;
+            var outCount = 0;
             foreach (var card in Deck.AllCards)
             {
-                if (hand.Contains(card))
+                if (currentHand.Contains(card))
                 {
                     continue;
                 }
 
-                hand.Add(card);
+                currentHand.Add(card);
 
-                if ((int)this.handEvaluator.GetBestHand(hand).RankType > target)
+                if (this.handEvaluator.GetBestHand(currentHand).RankType >= target)
                 {
-                    outs++;
+                    outCount++;
                 }
 
-                hand.Remove(card);
+                currentHand.Remove(card);
             }
 
-            return outs;
+            return outCount;
         }
     }
 }
