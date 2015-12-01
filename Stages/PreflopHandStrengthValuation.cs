@@ -9,7 +9,7 @@
         private static readonly int[,] StartingHandRecommendations =
             {
                 { 5, 5, 4, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2 }, // AA AKs AQs AJs ATs A9s A8s A7s A6s A5s A4s A3s A2s
-                { 5, 5, 3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1 }, // AKo KK KQs KJs KTs K9s K8s K7s K6s K5s K4s K3s K2s
+                { 5, 5, 4, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1 }, // AKo KK KQs KJs KTs K9s K8s K7s K6s K5s K4s K3s K2s
                 { 4, 3, 5, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 }, // AQo KQo QQ QJs QTs Q9s Q8s Q7s Q6s Q5s Q4s Q3s Q2s
                 { 3, 2, 2, 4, 3, 2, 2, 1, 0, 0, 0, 0, 0 }, // AJo KJo QJo JJ JTs J9s J8s J7s J6s J5s J4s J3s J2s
                 { 3, 2, 2, 2, 3, 2, 2, 1, 1, 0, 0, 0, 0 }, // ATo KTo QTo JTo TT T9s T8s T7s T6s T5s T4s T3s T2s
