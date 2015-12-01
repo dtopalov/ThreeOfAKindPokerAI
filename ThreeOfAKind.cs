@@ -4,6 +4,8 @@
     using System.Collections.Generic;
     using System.Linq;
 
+    using Helpers;
+
     using Logic;
     using Logic.Cards;
     using Logic.Helpers;
@@ -91,7 +93,7 @@
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
 
-                if (this.ownCardsStrength >= CardValuationType.Strong && this.CountOuts(this.hand, HandRankType.Straight) < 4 && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair && this.currentHandRank >= HandRankType.TwoPairs)
+                if (this.ownCardsStrength >= CardValuationType.Strong && Analyzers.CountOuts(this.hand, HandRankType.Straight) < 4 && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair && this.currentHandRank >= HandRankType.TwoPairs)
                 {
                     return PlayerAction.Raise((context.CurrentPot * 3) + MagicNumber);
                 }
@@ -246,7 +248,7 @@
 
             if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(this.hand, HandRankType.Straight);
+                outs = Analyzers.CountOuts(this.hand, HandRankType.Straight);
             }
 
             if (outs > 11)
@@ -326,11 +328,11 @@
 
             if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = this.CountOuts(this.hand, HandRankType.ThreeOfAKind);
+                outs = Analyzers.CountOuts(this.hand, HandRankType.ThreeOfAKind);
             }
             else if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(this.hand, HandRankType.Straight);
+                outs = Analyzers.CountOuts(this.hand, HandRankType.Straight);
             }
 
             if (isVeryAggressive && context.PreviousRoundActions.Any()
@@ -543,86 +545,6 @@
             }
 
             return PlayerAction.CheckOrCall();
-        }
-
-        private int CountOuts(ICollection<Card> currentHand, HandRankType target)
-        {
-            var outCount = 0;
-            foreach (var card in Deck.AllCards)
-            {
-                if (currentHand.Contains(card))
-                {
-                    continue;
-                }
-
-                currentHand.Add(card);
-
-                if (this.handEvaluator.GetBestHand(currentHand).RankType >= target)
-                {
-                    outCount++;
-                }
-
-                currentHand.Remove(card);
-            }
-
-            return outCount;
-        }
-
-        private int HasFlushChance(IEnumerable<Card> cards)
-        {
-            var suitedCards = cards.Select(c => c.Suit)
-                                   .GroupBy(c => c)
-                                   .OrderByDescending(g => g)
-                                   .FirstOrDefault()
-                                   .Count();
-
-            switch (suitedCards)
-            {
-                case 4:
-                    return 3;
-                case 3:
-                    return 2;
-                case 2:
-                    return 1;
-                default:
-                    return 0;
-            }
-        }
-
-        private int HasStraightChance(ICollection<Card> cards)
-        {
-            var sortedCards = cards.Select(c => (int)c.Type)
-                 .OrderByDescending(t => t)
-                 .ToList();
-
-            if (sortedCards.Contains(14))
-            {
-                sortedCards.Add(1);
-            }
-
-            var holesCount = 0;
-            var notConnectedCards = 0;
-
-            for (var i = 1; i < sortedCards.Count; i++)
-            {
-                if (sortedCards[i] - sortedCards[i - 1] < 3)
-                {
-                    holesCount += sortedCards[i - 1] - sortedCards[i] + 1;
-                }
-                else
-                {
-                    notConnectedCards++;
-                }
-
-                if (holesCount > 2)
-                {
-                    holesCount -= 2;
-                    notConnectedCards++;
-                }
-            }
-
-            // 3 - very big chance; 2 - likely to have, 1 - possible if very lucky, 0 or less - no possible - i think :)
-            return cards.Count - holesCount - notConnectedCards - 1;
         }
     }
 }

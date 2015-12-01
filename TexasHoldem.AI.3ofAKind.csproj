@@ -41,8 +41,9 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CardValuationType.cs" />
-    <Compile Include="Stages\PreflopHandStrengthValuation.cs" />
+    <Compile Include="Helpers\CardValuationType.cs" />
+    <Compile Include="Helpers\Analyzers.cs" />
+    <Compile Include="Helpers\PreflopHandStrengthValuation.cs" />
     <Compile Include="ThreeOfAKind.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
