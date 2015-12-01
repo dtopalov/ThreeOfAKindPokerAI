@@ -86,9 +86,7 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight
-                    && this.handEvaluator.GetBestHand(this.hand)
-                    .CompareTo(this.handEvaluator.GetBestHand(this.CommunityCards)) > 0)
+                if (this.currentHandRank >= HandRankType.Straight && this.ImproveHand())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -128,6 +126,12 @@
             return moneyLeft - MagicNumber > MagicNumber
                 ? moneyLeft - MagicNumber
                 : moneyLeft;
+        }
+
+        private bool ImproveHand()
+        {
+            return this.handEvaluator.GetBestHand(this.hand)
+                    .CompareTo(this.handEvaluator.GetBestHand(this.CommunityCards)) > 0;
         }
 
         private HandRankType GetCurrentHandRank()
