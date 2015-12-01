@@ -566,7 +566,7 @@
             return outCount;
         }
 
-        private int HasFlushChance(ICollection<Card> cards)
+        private int HasFlushChance(IEnumerable<Card> cards)
         {
             var suitedCards = cards.Select(c => c.Suit)
                                    .GroupBy(c => c)
@@ -574,22 +574,17 @@
                                    .FirstOrDefault()
                                    .Count();
 
-            if (suitedCards == 4)
+            switch (suitedCards)
             {
-                return 3;
+                case 4:
+                    return 3;
+                case 3:
+                    return 2;
+                case 2:
+                    return 1;
+                default:
+                    return 0;
             }
-
-            if (suitedCards == 3)
-            {
-                return 2;
-            }
-
-            if (suitedCards == 2)
-            {
-                return 1;
-            }
-
-            return 0;
         }
 
         private int HasStraightChance(ICollection<Card> cards)
@@ -624,9 +619,8 @@
                 }
             }
 
-            var result = sortedCards.Count - holesCount - notConnectedCards;
-
-            return sortedCards.Contains(14) ? result - 1 : result;
+            // 3 - very big chance; 2 - likely to have, 1 - possible if very lucky, 0 or less - no possible - i think :)
+            return cards.Count - holesCount - notConnectedCards - 1;
         }
     }
 }
