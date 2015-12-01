@@ -1,6 +1,6 @@
-﻿namespace TexasHoldem.AI.ThreeOfAKind
+﻿namespace TexasHoldem.AI.ThreeOfAKind.Helpers
 {
-    public enum CardValuationType
+    internal enum CardValuationType
     {
         Unplayable = 0,
         NotRecommended = 1000,

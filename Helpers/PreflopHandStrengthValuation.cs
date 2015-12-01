@@ -1,8 +1,8 @@
-﻿namespace TexasHoldem.AI.ThreeOfAKind.Stages
+﻿namespace TexasHoldem.AI.ThreeOfAKind.Helpers
 {
-    using TexasHoldem.Logic.Cards;
+    using Logic.Cards;
 
-    public static class PreflopHandStrengthValuation
+    internal static class PreflopHandStrengthValuation
     {
         private const int MaxCardTypeValue = 14;
 

@@ -11,8 +11,6 @@
     using Logic.Helpers;
     using Logic.Players;
 
-    using Stages;
-
     // TODO: HQC
     public class ThreeOfAKind : BasePlayer
     {
@@ -91,7 +89,10 @@
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
 
-                if (this.ownCardsStrength >= CardValuationType.Strong && Analyzers.CountOuts(this.hand, HandRankType.Straight) < 4 && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair && this.currentHandRank >= HandRankType.TwoPairs)
+                if (this.ownCardsStrength >= CardValuationType.Strong
+                    && this.CountOuts(this.hand, HandRankType.Straight) < 4
+                    && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair
+                    && this.currentHandRank >= HandRankType.TwoPairs)
                 {
                     return PlayerAction.Raise((context.CurrentPot * 3) + MagicNumber);
                 }
@@ -130,8 +131,10 @@
 
         private bool CommunityImproved()
         {
-            return this.handEvaluator.GetBestHand(this.hand)
-                    .CompareTo(this.handEvaluator.GetBestHand(this.CommunityCards)) > 0;
+            var currentHand = this.handEvaluator.GetBestHand(this.hand);
+            var community = this.handEvaluator.GetBestHand(this.CommunityCards);
+
+            return currentHand.CompareTo(community) > 0;
         }
 
         private HandRankType GetCurrentHandRank()
@@ -141,6 +144,29 @@
             this.hand.Add(this.SecondCard);
 
             return this.handEvaluator.GetBestHand(this.hand).RankType;
+        }
+
+        private int CountOuts(ICollection<Card> currentHand, HandRankType target)
+        {
+            var outCount = 0;
+            foreach (var card in Deck.AllCards)
+            {
+                if (currentHand.Contains(card))
+                {
+                    continue;
+                }
+
+                currentHand.Add(card);
+
+                if (this.handEvaluator.GetBestHand(currentHand).RankType >= target)
+                {
+                    outCount++;
+                }
+
+                currentHand.Remove(card);
+            }
+
+            return outCount;
         }
 
         private PlayerAction RiverLogic(GetTurnContext context)
@@ -252,7 +278,7 @@
 
             if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = Analyzers.CountOuts(this.hand, HandRankType.Straight);
+                outs = this.CountOuts(this.hand, HandRankType.Straight);
             }
 
             if (outs > 11)
@@ -332,11 +358,11 @@
 
             if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = Analyzers.CountOuts(this.hand, HandRankType.ThreeOfAKind);
+                outs = this.CountOuts(this.hand, HandRankType.ThreeOfAKind);
             }
             else if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = Analyzers.CountOuts(this.hand, HandRankType.Straight);
+                outs = this.CountOuts(this.hand, HandRankType.Straight);
             }
 
             if (isVeryAggressive && context.PreviousRoundActions.Any()

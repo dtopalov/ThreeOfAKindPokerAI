@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="Helpers\CardValuationType.cs" />
     <Compile Include="Helpers\Analyzers.cs" />
+    <Compile Include="Helpers\Risk.cs" />
     <Compile Include="Helpers\PreflopHandStrengthValuation.cs" />
     <Compile Include="ThreeOfAKind.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

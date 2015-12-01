@@ -3,38 +3,11 @@
     using System.Collections.Generic;
     using System.Linq;
 
-    using Logic;
     using Logic.Cards;
-    using Logic.Helpers;
 
-    public static class Analyzers
+    internal static class Analyzers
     {
-        private static readonly HandEvaluator HandEvaluator = new HandEvaluator();
-
-        public static int CountOuts(ICollection<Card> currentHand, HandRankType target)
-        {
-            var outCount = 0;
-            foreach (var card in Deck.AllCards)
-            {
-                if (currentHand.Contains(card))
-                {
-                    continue;
-                }
-
-                currentHand.Add(card);
-
-                if (HandEvaluator.GetBestHand(currentHand).RankType >= target)
-                {
-                    outCount++;
-                }
-
-                currentHand.Remove(card);
-            }
-
-            return outCount;
-        }
-
-        public static int HasFlushChance(IEnumerable<Card> cards)
+        public static Risk HasFlushRisk(IEnumerable<Card> cards)
         {
             var suitedCards = cards.Select(c => c.Suit)
                                    .GroupBy(c => c)
@@ -44,18 +17,19 @@
 
             switch (suitedCards)
             {
+                // case 4 - flush is on - handle elsewhere
                 case 4:
-                    return 3;
+                    return Risk.High;
                 case 3:
-                    return 2;
+                    return Risk.Moderate;
                 case 2:
-                    return 1;
+                    return Risk.Low;
                 default:
-                    return 0;
+                    return Risk.No;
             }
         }
 
-        public static int HasStraightChance(ICollection<Card> cards)
+        public static Risk HasStraightRisk(ICollection<Card> cards)
         {
             var sortedCards = cards.Select(c => (int)c.Type)
                  .OrderByDescending(t => t)
@@ -71,7 +45,7 @@
 
             for (var i = 1; i < sortedCards.Count; i++)
             {
-                if (sortedCards[i] - sortedCards[i - 1] < 3)
+                if (sortedCards[i] - sortedCards[i - 1] <= 3)
                 {
                     holesCount += sortedCards[i - 1] - sortedCards[i] + 1;
                 }
@@ -87,9 +61,20 @@
                 }
             }
 
+            var result = cards.Count - holesCount - notConnectedCards - 1;
+            if (result > 3)
+            {
+                result = 3;
+            }
+
+            if (result < 0)
+            {
+                result = 0;
+            }
+
             // 4 - straight in community cards - handle it elsewhere
             // 3 - very big chance; 2 - likely to have, 1 - possible if very lucky, 0 or less - no possible - i think :)
-            return cards.Count - holesCount - notConnectedCards - 1;
+            return (Risk)result;
         }
     }
 }
