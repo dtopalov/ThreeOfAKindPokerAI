@@ -84,7 +84,9 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight)
+                if (this.currentHandRank >= HandRankType.Straight
+                    && this.handEvaluator.GetBestHand(this.hand)
+                    .CompareTo(this.handEvaluator.GetBestHand(this.CommunityCards)) > 0)
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
