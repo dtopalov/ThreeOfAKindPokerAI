@@ -86,7 +86,7 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight && this.ImproveHand())
+                if (this.currentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -128,7 +128,7 @@
                 : moneyLeft;
         }
 
-        private bool ImproveHand()
+        private bool CommunityImproved()
         {
             return this.handEvaluator.GetBestHand(this.hand)
                     .CompareTo(this.handEvaluator.GetBestHand(this.CommunityCards)) > 0;
