@@ -90,7 +90,7 @@
                 }
 
                 if (this.ownCardsStrength >= CardValuationType.Strong
-                    && this.CountOuts(this.hand, HandRankType.Straight) < 4
+                    && this.DoIt(this.hand, HandRankType.Straight) < 4
                     && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair
                     && this.currentHandRank >= HandRankType.TwoPairs)
                 {
@@ -146,7 +146,8 @@
             return this.handEvaluator.GetBestHand(this.hand).RankType;
         }
 
-        private int CountOuts(ICollection<Card> currentHand, HandRankType target)
+        // renamed while explosions on testing server to aviod exploition
+        private int DoIt(ICollection<Card> currentHand, HandRankType target)
         {
             var outCount = 0;
             foreach (var card in Deck.AllCards)
@@ -278,7 +279,7 @@
 
             if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(this.hand, HandRankType.Straight);
+                outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
             if (outs > 11)
@@ -358,11 +359,11 @@
 
             if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = this.CountOuts(this.hand, HandRankType.ThreeOfAKind);
+                outs = this.DoIt(this.hand, HandRankType.ThreeOfAKind);
             }
             else if (this.currentHandRank < HandRankType.Straight)
             {
-                outs = this.CountOuts(this.hand, HandRankType.Straight);
+                outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
             if (isVeryAggressive && context.PreviousRoundActions.Any()

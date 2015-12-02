@@ -29,11 +29,13 @@
             }
         }
 
-        public static Risk HasStraightRisk(ICollection<Card> cards)
+        public static Risk HasStraightRisk(IEnumerable<Card> cards)
         {
             var sortedCards = cards.Select(c => (int)c.Type)
-                 .OrderByDescending(t => t)
-                 .ToList();
+                .Distinct()
+                .OrderByDescending(t => t).ToList();
+
+            var cardsToCheck = sortedCards.Count;
 
             if (sortedCards.Contains(14))
             {
@@ -45,7 +47,7 @@
 
             for (var i = 1; i < sortedCards.Count; i++)
             {
-                if (sortedCards[i] - sortedCards[i - 1] <= 3)
+                if (sortedCards[i] - sortedCards[i - 1] < 3)
                 {
                     holesCount += sortedCards[i - 1] - sortedCards[i] + 1;
                 }
@@ -61,7 +63,7 @@
                 }
             }
 
-            var result = cards.Count - holesCount - notConnectedCards - 1;
+            var result = cardsToCheck - holesCount - notConnectedCards - 1;
             if (result > 3)
             {
                 result = 3;
@@ -73,7 +75,10 @@
             }
 
             // 4 - straight in community cards - handle it elsewhere
-            // 3 - very big chance; 2 - likely to have, 1 - possible if very lucky, 0 or less - no possible - i think :)
+            // 3 - very big chance
+            // 2 - may get it - 3 in a row out of 3 or 4 with single hole
+            // 1 - possible if very lucky
+            // 0 or less - no possible - i think :)
             return (Risk)result;
         }
     }

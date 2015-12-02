@@ -5,6 +5,6 @@
         No = 0,
         Low = 1,
         Moderate = 2,
-        High
+        High = 3
     }
 }
