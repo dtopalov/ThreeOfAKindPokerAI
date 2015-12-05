@@ -227,7 +227,7 @@
                 }
             }
 
-            if (context.CanCheck && !isCallingStation)
+            if (this.lastAction == PlayerActionType.CheckCall && !isCallingStation)
             {
                 return PlayerAction.Raise((context.CurrentPot / 2) + MagicNumber);
             }
@@ -235,7 +235,7 @@
             // TODO: add handrank
             // huge miss- if we are first what? - to handle and change to this.lastAction
             if (context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                    && this.lastAction == PlayerActionType.Raise)
             {
                 if (this.currentHandRank >= HandRankType.Straight)
                 {
@@ -340,7 +340,7 @@
 
             if (outs < 8)
             {
-                if (this.lastAction == PlayerActionType.Raise)
+                if (this.lastAction == PlayerActionType.Raise && context.MoneyToCall * 100 / context.CurrentPot > outs * 2)
                 {
                     return PlayerAction.Fold();
                 }
@@ -433,27 +433,26 @@
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
             // to rework ... or not
-
-            
-
             // handling AlwaysAllIn Player
             if (this.isAlwaysAllIn && context.CurrentPot + context.MoneyLeft == 2000)
             {
                 if (context.SmallBlind <= 3)
                 {
-                    if (this.ownCardsStrength >= CardValuationType.Recommended)
+                    if (this.ownCardsStrength > CardValuationType.Recommended)
                     {
                         return PlayerAction.CheckOrCall();
                     }
+
                     return PlayerAction.Fold();
                 }
+
                 if (this.ownCardsStrength >= CardValuationType.Recommended ||
                     this.FirstCard.Type >= CardType.King ||
-                    this.SecondCard.Type >= CardType.King ||
-                    (this.FirstCard.Type == this.SecondCard.Type))
+                    this.SecondCard.Type >= CardType.King)
                 {
                     return PlayerAction.CheckOrCall();
                 }
+
                 return PlayerAction.Fold();
             }
 
