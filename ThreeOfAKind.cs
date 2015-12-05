@@ -28,11 +28,11 @@
 
         private static bool isVeryAggressive;
 
-        private int allInCount = 0;
-        private int raiseCount = 0;
+        private int allInCount;
+        private int raiseCount;
 
-        private bool isAlwaysAllIn = false;
-        private bool isAlwaysRaise = false;
+        private bool isAlwaysAllIn;
+        private bool isAlwaysRaise;
 
         private readonly IHandEvaluator handEvaluator = new HandEvaluator();
         private CardValuationType ownCardsStrength = 0;
@@ -70,9 +70,7 @@
             if (this.opponentActions.Any() && !flag && context.SmallBlind == 5)
             {
                 flag = true;
-                isCallingStation = this.FindCallingStation(this.opponentActions) &&
-                    context.PreviousRoundActions.Any() &&
-                    !context.PreviousRoundActions.Last().PlayerName.Contains("mokin");
+                isCallingStation = this.FindCallingStation(this.opponentActions);
 
                 isVeryAggressive = this.FindAggressiveStation(this.opponentActions);
             }
@@ -84,11 +82,35 @@
             }
 
             // fishing prefix - nais :)
-            if (/*context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
-                && context.MoneyToCall > 0
-                &&*/ context.MoneyToCall < MagicFishingNumber && context.RoundType != GameRoundType.PreFlop)
+            if (!this.isAlwaysAllIn ||
+                (context.MoneyToCall < MagicFishingNumber &&
+                context.RoundType != GameRoundType.PreFlop))
             {
+                // catching AlwaysAllIn and AlwaysRaisePlayer
+                if (context.SmallBlind == 1)
+                {
+                    if (!this.isAlwaysAllIn && context.MoneyToCall > 990)
+                    {
+                        this.allInCount++;
+                        if (this.allInCount >= MagicNumber + 2)
+                        {
+                            this.isAlwaysAllIn = true;
+                        }
+                        if (this.ownCardsStrength < CardValuationType.Strong)
+                        {
+                            return PlayerAction.Fold();
+                        }
+                    }
+                    if (!this.isAlwaysRaise && context.MoneyToCall == context.SmallBlind)
+                    {
+                        this.raiseCount++;
+                        if (this.raiseCount >= MagicNumber + 2)
+                        {
+                            this.isAlwaysRaise = true;
+                        }
+                    }
+                }
+
                 if (context.RoundType != GameRoundType.River)
                 {
                     return PlayerAction.CheckOrCall();
@@ -192,8 +214,7 @@
 
             if (isVeryAggressive &&
                 this.lastAction == PlayerActionType.Raise
-                && context.MoneyToCall <= ((context.CurrentPot / 2) + 1)
-                && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+                && context.MoneyToCall <= ((context.CurrentPot / 2) + 1))
             {
                 if (this.FirstCard.Type >= CardType.Queen || this.SecondCard.Type >= CardType.Queen)
                 {
@@ -297,7 +318,7 @@
                 {
                     if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2)
                     {
-                        if (isVeryAggressive && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+                        if (isVeryAggressive)
                         {
                             return PlayerAction.Raise(AllIn(context.MoneyLeft));
                         }
@@ -311,7 +332,7 @@
                 return PlayerAction.Raise(((context.CurrentPot * 2) / 3) + MagicNumber);
             }
 
-            if (!context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall") && isVeryAggressive && this.currentHandRank == HandRankType.Pair &&
+            if (isVeryAggressive && this.currentHandRank == HandRankType.Pair &&
                 context.MoneyToCall <= context.CurrentPot * 2 / 3)
             {
                 return PlayerAction.CheckOrCall();
@@ -372,8 +393,7 @@
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
-            if (this.lastAction == PlayerActionType.Raise
-                && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
+            if (this.lastAction == PlayerActionType.Raise)
             {
                 if (outs >= 8)
                 {
@@ -414,30 +434,7 @@
         {
             // to rework ... or not
 
-            // catching AlwaysAllIn and AlwaysRaisePlayer
-            if (context.SmallBlind == 1)
-            {
-                if (!this.isAlwaysAllIn && context.MoneyToCall > 990)
-                {
-                    this.allInCount++;
-                    if (this.allInCount >= MagicNumber + 2)
-                    {
-                        this.isAlwaysAllIn = true;
-                    }
-                    if (this.ownCardsStrength < CardValuationType.Strong)
-                    {
-                        return PlayerAction.Fold();
-                    }
-                }
-                if (!this.isAlwaysRaise && context.MoneyToCall == context.SmallBlind)
-                {
-                    this.raiseCount++;
-                    if (this.raiseCount >= MagicNumber + 2)
-                    {
-                        this.isAlwaysRaise = true;
-                    }
-                }
-            }
+            
 
             // handling AlwaysAllIn Player
             if (this.isAlwaysAllIn && context.CurrentPot + context.MoneyLeft == 2000)
