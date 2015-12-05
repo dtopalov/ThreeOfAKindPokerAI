@@ -119,12 +119,17 @@
                     return PlayerAction.CheckOrCall();
                 }
 
+                if (this.hand.Count < 7)
+                {
+                    this.currentBestHand = this.GetBestHand();
+                }
+
                 if (this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
 
-                if (this.ownCardsStrength >= CardValuationType.Strong
+                if (this.ownCardsStrength >= CardValuationType.Recommended
                     && this.DoIt(this.hand, HandRankType.Straight) < 4
                     && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair
                     && this.CurrentHandRank >= HandRankType.TwoPairs)
