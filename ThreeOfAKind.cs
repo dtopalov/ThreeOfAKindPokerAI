@@ -16,9 +16,7 @@
     {
         private const int MagicFishingNumber = 12;
         private const int MagicNumber = 3;
-
         private PlayerActionType? lastAction;
-
         private static bool isSmallBlind;
         private static int outs;
 
@@ -31,8 +29,10 @@
         private static bool isVeryAggressive;
 
         private int allInCount = 0;
-
         private int raiseCount = 0;
+
+        private bool isAlwaysAllIn = false;
+        private bool isAlwaysRaise = false;
 
         private readonly IHandEvaluator handEvaluator = new HandEvaluator();
         private CardValuationType ownCardsStrength = 0;
@@ -40,15 +40,10 @@
         private ICollection<Card> hand;
         private ICollection<PlayerActionType> opponentActions = new List<PlayerActionType>();
 
-        private bool isAlwaysAllIn = false;
-
-        private bool isAlwaysRaise = false;
-
         public override string Name { get; } = "AlwaysCallDummyPlayer_" + Guid.NewGuid();
 
         public override PlayerAction GetTurn(GetTurnContext context)
         {
-            // checking and setting small or big blind position
             if (!smallBlindFlag && context.RoundType == GameRoundType.PreFlop)
             {
                 smallBlindFlag = true;
@@ -65,15 +60,14 @@
             //{
             //    this.lastAction = context.PreviousRoundActions.Last().Action.Type;
             //}
-
             // collecting info for opponent
+
             if (context.PreviousRoundActions.Any() && context.SmallBlind <= 2 && context.RoundType != GameRoundType.PreFlop)
             {
                 this.opponentActions.Add(context.PreviousRoundActions.Last().Action.Type);
             }
 
-            // setting opponent type
-            if (this.opponentActions.Any() && !flag && context.SmallBlind == 3)
+            if (this.opponentActions.Any() && !flag && context.SmallBlind == 5)
             {
                 flag = true;
                 isCallingStation = this.FindCallingStation(this.opponentActions) &&
@@ -143,6 +137,14 @@
             return moneyLeft - MagicNumber > MagicNumber
                 ? moneyLeft - MagicNumber
                 : moneyLeft;
+        }
+
+        private bool CommunityImproved()
+        {
+            var currentHand = this.handEvaluator.GetBestHand(this.hand);
+            var community = this.handEvaluator.GetBestHand(this.CommunityCards);
+
+            return currentHand.CompareTo(community) > 0;
         }
 
         private HandRankType GetCurrentHandRank()
@@ -238,6 +240,28 @@
             }
 
             return PlayerAction.CheckOrCall();
+        }
+
+        private bool FindCallingStation(ICollection<PlayerActionType> actions)
+        {
+            int calls = actions.Count(x => x == PlayerActionType.CheckCall);
+            if ((calls * 100 / actions.Count) > 65)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool FindAggressiveStation(ICollection<PlayerActionType> actions)
+        {
+            int raises = actions.Count(x => x == PlayerActionType.Raise);
+            if (raises * 100 / actions.Count > 70)
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private PlayerAction TurnLogic(GetTurnContext context)
@@ -396,12 +420,6 @@
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
             // to rework ... or not
-            this.ownCardsStrength = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
-
-            if (context.MoneyLeft <= context.SmallBlind * 8 /*&& ownCardsStrength > CardValuationType.Unplayable*/)
-            {
-                return PlayerAction.Raise(context.MoneyLeft);
-            }
 
             // catching AlwaysAllIn and AlwaysRaisePlayer
             if (context.SmallBlind == 1)
@@ -413,13 +431,11 @@
                     {
                         this.isAlwaysAllIn = true;
                     }
-
                     if (this.ownCardsStrength < CardValuationType.Strong)
                     {
                         return PlayerAction.Fold();
                     }
                 }
-
                 if (!this.isAlwaysRaise && context.MoneyToCall == context.SmallBlind)
                 {
                     this.raiseCount++;
@@ -439,10 +455,8 @@
                     {
                         return PlayerAction.CheckOrCall();
                     }
-
                     return PlayerAction.Fold();
                 }
-
                 if (this.ownCardsStrength >= CardValuationType.Recommended ||
                     this.FirstCard.Type >= CardType.King ||
                     this.SecondCard.Type >= CardType.King ||
@@ -450,11 +464,16 @@
                 {
                     return PlayerAction.CheckOrCall();
                 }
-
                 return PlayerAction.Fold();
             }
 
-            // small blind, first to act
+            this.ownCardsStrength = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
+
+            if (context.MoneyLeft <= context.SmallBlind * 10 /*&& ownCardsStrength > CardValuationType.Unplayable*/)
+            {
+                return PlayerAction.Raise(context.MoneyLeft);
+            }
+
             if (context.PreviousRoundActions.Count == 2)
             {
                 if (this.ownCardsStrength == CardValuationType.Unplayable)
@@ -466,25 +485,25 @@
                 {
                     if (isCallingStation)
                     {
-                        return PlayerAction.Raise(context.CurrentPot * 7 - MagicNumber);
+                        return PlayerAction.Raise((context.CurrentPot * 7) - MagicNumber);
                     }
 
                     if (isVeryAggressive)
                     {
-                        PlayerAction.Raise(context.CurrentPot * 2 + MagicNumber);
+                        PlayerAction.Raise((context.CurrentPot * 2) + MagicNumber);
                     }
 
-                    return PlayerAction.Raise(context.CurrentPot * 3 - MagicNumber);
+                    return PlayerAction.Raise((context.CurrentPot * 10) - MagicNumber);
                 }
 
                 if (this.ownCardsStrength >= CardValuationType.Recommended)
                 {
                     if (isCallingStation)
                     {
-                        return PlayerAction.Raise(10 * context.SmallBlind - MagicNumber);
+                        return PlayerAction.Raise((10 * context.SmallBlind) - MagicNumber);
                     }
 
-                    return PlayerAction.Raise(6 * context.SmallBlind);
+                    return PlayerAction.Raise((6 * context.SmallBlind) - MagicNumber);
                 }
 
                 if (this.ownCardsStrength == CardValuationType.Risky)
@@ -494,26 +513,27 @@
                         return PlayerAction.CheckOrCall();
                     }
 
-                    return PlayerAction.Raise(5 * context.SmallBlind - MagicNumber);
+                    return PlayerAction.Raise((5 * context.SmallBlind) - MagicNumber);
                 }
 
                 if (this.ownCardsStrength == CardValuationType.NotRecommended)
                 {
-                    if (isAlwaysRaise)
-                    {
-                        return PlayerAction.Fold();
-                    }
+                    // drops 70-80 - not good
+                    //if (isAlwaysRaise)
+                    //{
+                    //    return PlayerAction.Fold();
+                    //}
 
                     if (isCallingStation)
                     {
                         return PlayerAction.CheckOrCall();
                     }
 
-                    return PlayerAction.Raise(4 * context.SmallBlind + MagicNumber);
+                    return PlayerAction.Raise((4 * context.SmallBlind) + MagicNumber);
                 }
             }
 
-            // Facing a reraise
+            // Facing a raise
             if (isSmallBlind && context.PreviousRoundActions.Count > 2)
             {
                 if (this.ownCardsStrength == CardValuationType.NotRecommended)
@@ -552,7 +572,7 @@
                     return PlayerAction.Fold();
                 }
 
-                if (context.MoneyToCall <= context.MoneyLeft * 0.2)
+                if (isSmallBlind && context.MoneyToCall <= context.MoneyLeft * 0.2)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -560,7 +580,7 @@
                 return PlayerAction.Fold();
             }
 
-            // Big Blind
+            // Big blind
             if (!isSmallBlind && context.PreviousRoundActions.Count >= 3)
             {
                 if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
@@ -578,12 +598,13 @@
 
                 if (this.ownCardsStrength == CardValuationType.Risky)
                 {
-                    if (context.MoneyToCall > context.MoneyLeft * 0.1)
+                    if (context.MoneyToCall > context.MoneyLeft * 0.2)
                     {
                         return PlayerAction.Fold();
                     }
 
                     return PlayerAction.CheckOrCall();
+
                 }
 
                 if (context.PreviousRoundActions.Last().Action.Type == PlayerActionType.CheckCall)
@@ -640,36 +661,6 @@
             }
 
             return PlayerAction.CheckOrCall();
-        }
-
-        private bool FindCallingStation(ICollection<PlayerActionType> actions)
-        {
-            int calls = actions.Count(x => x == PlayerActionType.CheckCall);
-            if ((calls * 100 / actions.Count) > 65)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private bool FindAggressiveStation(ICollection<PlayerActionType> actions)
-        {
-            int raises = actions.Count(x => x == PlayerActionType.Raise);
-            if (raises * 100 / actions.Count > 70)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private bool CommunityImproved()
-        {
-            var currentHand = this.handEvaluator.GetBestHand(this.hand);
-            var community = this.handEvaluator.GetBestHand(this.CommunityCards);
-
-            return currentHand.CompareTo(community) > 0;
         }
     }
 }

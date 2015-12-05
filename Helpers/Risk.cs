@@ -1,6 +1,6 @@
 ﻿namespace TexasHoldem.AI.ThreeOfAKind.Helpers
 {
-    internal enum Risk
+    public enum Risk
     {
         No = 0,
         Low = 1,
