@@ -56,12 +56,12 @@
                 return PlayerAction.CheckOrCall();
             }
 
-            //if (context.PreviousRoundActions.Any())
-            //{
-            //    this.lastAction = context.PreviousRoundActions.Last().Action.Type;
-            //}
-            // collecting info for opponent
+            if (context.PreviousRoundActions.Any())
+            {
+                this.lastAction = context.PreviousRoundActions.Last().Action.Type;
+            }
 
+            // collecting info for opponent
             if (context.PreviousRoundActions.Any() && context.SmallBlind <= 2 && context.RoundType != GameRoundType.PreFlop)
             {
                 this.opponentActions.Add(context.PreviousRoundActions.Last().Action.Type);
@@ -185,14 +185,13 @@
             this.currentHandRank = this.handEvaluator.GetBestHand(this.hand).RankType;
 
             if (isCallingStation && this.currentHandRank > HandRankType.Pair &&
-                context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                this.lastAction < PlayerActionType.Raise)
             {
                 return PlayerAction.Raise((context.CurrentPot * 2) - MagicNumber);
             }
 
-            if (isVeryAggressive && context.PreviousRoundActions.Any() &&
-                context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+            if (isVeryAggressive &&
+                this.lastAction == PlayerActionType.Raise
                 && context.MoneyToCall <= ((context.CurrentPot / 2) + 1)
                 && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
             {
@@ -213,6 +212,7 @@
             }
 
             // TODO: add handrank
+            // huge miss- if we are first what? - to handle and change to this.lastAction
             if (context.PreviousRoundActions.Any()
                     && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
             {
@@ -273,8 +273,7 @@
 
             if (this.currentHandRank >= HandRankType.TwoPairs)
             {
-                if (context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                if (this.lastAction < PlayerActionType.Raise)
                 {
                     return PlayerAction.Raise(context.CurrentPot + MagicNumber);
                 }
@@ -294,8 +293,7 @@
 
             if (outs > 11)
             {
-                if (context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                if (this.lastAction == PlayerActionType.Raise)
                 {
                     if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2)
                     {
@@ -321,8 +319,7 @@
 
             if (outs < 8)
             {
-                if (context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                if (this.lastAction == PlayerActionType.Raise)
                 {
                     return PlayerAction.Fold();
                 }
@@ -353,8 +350,7 @@
 
             if (this.currentHandRank > HandRankType.TwoPairs)
             {
-                if (context.PreviousRoundActions.Any()
-                    && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise)
+                if (this.lastAction < PlayerActionType.Raise)
                 {
                     return PlayerAction.Raise(context.CurrentPot + MagicNumber);
                 }
@@ -376,8 +372,7 @@
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
-            if (isVeryAggressive && context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise
+            if (this.lastAction == PlayerActionType.Raise
                 && !context.PreviousRoundActions.Last().PlayerName.Contains("ColdCall"))
             {
                 if (outs >= 8)
@@ -393,9 +388,8 @@
 
             if (outs > 8)
             {
-                if (context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type != PlayerActionType.Raise
-                && context.MoneyToCall * 100 / context.CurrentPot < outs * 5)
+                if (this.lastAction < PlayerActionType.Raise &&
+                    context.MoneyToCall * 100 / context.CurrentPot < outs * 5)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -405,8 +399,7 @@
 
             if (outs < 6)
             {
-                if (context.PreviousRoundActions.Any()
-                && context.PreviousRoundActions.Last().Action.Type == PlayerActionType.Raise)
+                if (this.lastAction == PlayerActionType.Raise)
                 {
                     return PlayerAction.Fold();
                 }
