@@ -275,7 +275,7 @@
         private bool FindCallingStation(ICollection<PlayerActionType> actions)
         {
             int calls = actions.Count(x => x == PlayerActionType.CheckCall);
-            if (actions.Any() && (calls * 100 / actions.Count) > 65)
+            if (actions.Any() && (calls * 100 / actions.Count) > 73)
             {
                 return true;
             }
@@ -286,7 +286,7 @@
         private bool FindAggressiveStation(ICollection<PlayerActionType> actions)
         {
             int raises = actions.Count(x => x == PlayerActionType.Raise);
-            if (actions.Any() && raises * 100 / actions.Count > 70)
+            if (actions.Any() && raises * 100 / actions.Count > 61)
             {
                 return true;
             }
@@ -528,7 +528,7 @@
 
                     if (isVeryAggressive)
                     {
-                        PlayerAction.Raise((context.CurrentPot * 2) + MagicNumber);
+                        return PlayerAction.Raise((context.CurrentPot * 2) + MagicNumber);
                     }
 
                     return PlayerAction.Raise((context.CurrentPot * 10) - MagicNumber);
