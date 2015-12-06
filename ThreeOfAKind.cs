@@ -117,17 +117,25 @@
             {
                 if (context.RoundType != GameRoundType.River)
                 {
+                    if (context.RoundType == GameRoundType.Turn)
+                    {
+                        if (this.FirstCard.Type == this.SecondCard.Type)
+                        {
+                            this.DoIt(this.hand, HandRankType.ThreeOfAKind);
+                        }
+                        else if (this.CurrentHandRank < HandRankType.Straight &&
+                            this.FirstCard.Type != this.SecondCard.Type)
+                        {
+                            this.DoIt(this.hand, HandRankType.Straight);
+                        }
+                    }
+
                     return PlayerAction.CheckOrCall();
                 }
 
                 if (context.RoundType == GameRoundType.River && this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
-                }
-
-                if (context.RoundType == GameRoundType.Flop || context.RoundType == GameRoundType.Flop)
-                {
-                    this.DoIt(this.hand, HandRankType.Straight);
                 }
 
                 if (this.ownCardsStrength >= CardValuationType.Strong
@@ -338,7 +346,7 @@
                 return PlayerAction.Raise(((context.CurrentPot * 2) / 3) + MagicNumber);
             }
 
-            if (isVeryAggressive && this.CurrentHandRank == HandRankType.Pair &&
+            if (isVeryAggressive && this.CurrentHandRank >= HandRankType.Pair &&
                 context.MoneyToCall <= context.CurrentPot * 2 / 3)
             {
                 return PlayerAction.CheckOrCall();
