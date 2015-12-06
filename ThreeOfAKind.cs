@@ -61,12 +61,15 @@
                 PlayerActionType.Fold;
 
             // collecting info for opponent
-            if (context.PreviousRoundActions.Any() && context.SmallBlind <= 2 && context.RoundType != GameRoundType.PreFlop)
+            if (context.PreviousRoundActions.Any() && context.SmallBlind <= 10 && context.RoundType != GameRoundType.PreFlop)
             {
-                this.opponentActions.Add(context.PreviousRoundActions.Last().Action.Type);
+                if (context.CurrentPot >= 10)
+                {
+                    this.opponentActions.Add(context.PreviousRoundActions.Last().Action.Type);
+                }
             }
 
-            if (this.opponentActions.Any() && !flag && context.SmallBlind == 5)
+            if (this.opponentActions.Any() && (!flag && context.SmallBlind == 2) || (flag && context.SmallBlind == 10))
             {
                 flag = true;
                 isCallingStation = this.FindCallingStation(this.opponentActions);
