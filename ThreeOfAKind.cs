@@ -16,31 +16,31 @@
     {
         private const int MagicFishingNumber = 12;
         private const int MagicNumber = 3;
-        private PlayerActionType? lastAction;
+
         private static bool isSmallBlind;
         private static int outs;
-
         private static bool flag;
-
         private static bool smallBlindFlag;
-
         private static bool isCallingStation;
-
         private static bool isVeryAggressive;
+
+        private readonly IHandEvaluator handEvaluator = new HandEvaluator();
+        private readonly ICollection<PlayerActionType> opponentActions = new List<PlayerActionType>();
+
+        private PlayerActionType? lastAction;
 
         private int allInCount;
         private int raiseCount;
 
         private bool isAlwaysAllIn;
         private bool isAlwaysRaise;
-
-        private readonly IHandEvaluator handEvaluator = new HandEvaluator();
         private CardValuationType ownCardsStrength = 0;
-        private HandRankType currentHandRank;
+        private BestHand currentBestHand;
         private ICollection<Card> hand;
-        private ICollection<PlayerActionType> opponentActions = new List<PlayerActionType>();
 
         public override string Name { get; } = "AlwaysCallDummyPlayer_" + Guid.NewGuid();
+
+        private HandRankType CurrentHandRank => this.currentBestHand.RankType;
 
         public override PlayerAction GetTurn(GetTurnContext context)
         {
@@ -77,45 +77,37 @@
             // get current Rank
             if (context.RoundType != GameRoundType.PreFlop)
             {
-                this.currentHandRank = this.GetCurrentHandRank();
+                this.currentBestHand = this.GetCurrentBestHand();
             }
 
-            // fishing prefix - nais :)
-            if (!this.isAlwaysAllIn ||
+            // catching AlwaysRaisePlayer
+            if (context.SmallBlind == 1 &&
+                !this.isAlwaysRaise &&
+                context.RoundType == GameRoundType.PreFlop &&
+                (context.PreviousRoundActions.Count == 3 ||
+                context.PreviousRoundActions.Count == 4))
+            {
+                if (!this.isAlwaysRaise && context.MoneyToCall == 1)
+                {
+                    this.raiseCount++;
+                    if (this.raiseCount > MagicNumber)
+                    {
+                        this.isAlwaysRaise = true;
+                    }
+                }
+            }
+
+            // fishing prefix - handles fish and always raise player
+            if ((this.isAlwaysRaise && !this.isAlwaysAllIn) ||
                 (context.MoneyToCall < MagicFishingNumber &&
                 context.RoundType != GameRoundType.PreFlop))
             {
-                // catching AlwaysAllIn and AlwaysRaisePlayer
-                if (context.SmallBlind == 1)
-                {
-                    if (!this.isAlwaysAllIn && context.MoneyToCall > 990)
-                    {
-                        this.allInCount++;
-                        if (this.allInCount >= MagicNumber + 2)
-                        {
-                            this.isAlwaysAllIn = true;
-                        }
-                        if (this.ownCardsStrength < CardValuationType.Strong)
-                        {
-                            return PlayerAction.Fold();
-                        }
-                    }
-                    if (!this.isAlwaysRaise && context.MoneyToCall == context.SmallBlind)
-                    {
-                        this.raiseCount++;
-                        if (this.raiseCount >= MagicNumber + 2)
-                        {
-                            this.isAlwaysRaise = true;
-                        }
-                    }
-                }
-
                 if (context.RoundType != GameRoundType.River)
                 {
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight && this.CommunityImproved())
+                if (this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -123,7 +115,7 @@
                 if (this.ownCardsStrength >= CardValuationType.Strong
                     && this.DoIt(this.hand, HandRankType.Straight) < 4
                     && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair
-                    && this.currentHandRank >= HandRankType.TwoPairs)
+                    && this.CurrentHandRank >= HandRankType.TwoPairs)
                 {
                     return PlayerAction.Raise((context.CurrentPot * 3) + MagicNumber);
                 }
@@ -162,19 +154,18 @@
 
         private bool CommunityImproved()
         {
-            var currentHand = this.handEvaluator.GetBestHand(this.hand);
             var community = this.handEvaluator.GetBestHand(this.CommunityCards);
 
-            return currentHand.CompareTo(community) > 0;
+            return this.currentBestHand.CompareTo(community) > 0;
         }
 
-        private HandRankType GetCurrentHandRank()
+        private BestHand GetCurrentBestHand()
         {
             this.hand = this.CommunityCards.ToList();
             this.hand.Add(this.FirstCard);
             this.hand.Add(this.SecondCard);
 
-            return this.handEvaluator.GetBestHand(this.hand).RankType;
+            return this.handEvaluator.GetBestHand(this.hand);
         }
 
         // renamed while explosions on testing server to aviod exploition
@@ -203,9 +194,7 @@
 
         private PlayerAction RiverLogic(GetTurnContext context)
         {
-            this.currentHandRank = this.handEvaluator.GetBestHand(this.hand).RankType;
-
-            if (isCallingStation && this.currentHandRank > HandRankType.Pair &&
+            if (isCallingStation && this.CurrentHandRank > HandRankType.Pair &&
                 this.lastAction < PlayerActionType.Raise)
             {
                 return PlayerAction.Raise((context.CurrentPot * 2) - MagicNumber);
@@ -220,7 +209,7 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight && this.CommunityImproved())
+                if (this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -232,20 +221,19 @@
             }
 
             // TODO: add handrank
-            // huge miss- if we are first what? - to handle and change to this.lastAction
             if (this.lastAction == PlayerActionType.Raise)
             {
-                if (this.currentHandRank >= HandRankType.Straight && this.CommunityImproved())
+                if (this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(context.CurrentPot + MagicNumber);
                 }
 
-                if (this.currentHandRank >= HandRankType.TwoPairs)
+                if (this.CurrentHandRank >= HandRankType.TwoPairs)
                 {
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (!isCallingStation && context.MoneyToCall <= context.CurrentPot / 2 && this.currentHandRank >= HandRankType.Pair)
+                if (!isCallingStation && context.MoneyToCall <= context.CurrentPot / 2 && this.CurrentHandRank >= HandRankType.Pair)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -253,7 +241,7 @@
                 return PlayerAction.Fold();
             }
 
-            if (this.currentHandRank >= HandRankType.TwoPairs && this.CommunityImproved())
+            if (this.CurrentHandRank >= HandRankType.TwoPairs && this.CommunityImproved())
             {
                 return PlayerAction.Raise(context.CurrentPot + MagicNumber);
             }
@@ -285,19 +273,19 @@
 
         private PlayerAction TurnLogic(GetTurnContext context)
         {
-            if (isCallingStation && this.currentHandRank > HandRankType.Pair)
+            if (isCallingStation && this.CurrentHandRank > HandRankType.Pair)
             {
                 return PlayerAction.Raise((context.CurrentPot * 2) + MagicNumber);
             }
 
-            if (this.currentHandRank >= HandRankType.TwoPairs)
+            if (this.CurrentHandRank >= HandRankType.TwoPairs)
             {
                 if (this.lastAction < PlayerActionType.Raise)
                 {
                     return PlayerAction.Raise(context.CurrentPot + MagicNumber);
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight)
+                if (this.CurrentHandRank >= HandRankType.Straight)
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -305,7 +293,7 @@
                 return PlayerAction.CheckOrCall();
             }
 
-            if (this.currentHandRank < HandRankType.Straight)
+            if (this.CurrentHandRank < HandRankType.Straight)
             {
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
@@ -330,7 +318,7 @@
                 return PlayerAction.Raise(((context.CurrentPot * 2) / 3) + MagicNumber);
             }
 
-            if (isVeryAggressive && this.currentHandRank == HandRankType.Pair &&
+            if (isVeryAggressive && this.CurrentHandRank == HandRankType.Pair &&
                 context.MoneyToCall <= context.CurrentPot * 2 / 3)
             {
                 return PlayerAction.CheckOrCall();
@@ -349,32 +337,32 @@
 
         private PlayerAction FlopLogic(GetTurnContext context)
         {
-            if (isCallingStation && this.currentHandRank > HandRankType.Pair)
+            if (isCallingStation && this.CurrentHandRank > HandRankType.Pair)
             {
                 return PlayerAction.Raise((context.CurrentPot * 2) - MagicNumber);
             }
 
             if (isVeryAggressive)
             {
-                if (this.currentHandRank >= HandRankType.TwoPairs)
+                if (this.CurrentHandRank >= HandRankType.TwoPairs)
                 {
                     return PlayerAction.Raise((context.MoneyToCall * 2) + MagicNumber);
                 }
 
-                if (context.MoneyToCall <= context.CurrentPot && this.currentHandRank >= HandRankType.Pair)
+                if (context.MoneyToCall <= context.CurrentPot && this.CurrentHandRank >= HandRankType.Pair)
                 {
                     return PlayerAction.CheckOrCall();
                 }
             }
 
-            if (this.currentHandRank > HandRankType.TwoPairs)
+            if (this.CurrentHandRank > HandRankType.TwoPairs)
             {
                 if (this.lastAction < PlayerActionType.Raise)
                 {
                     return PlayerAction.Raise(context.CurrentPot + MagicNumber);
                 }
 
-                if (this.currentHandRank >= HandRankType.Straight)
+                if (this.CurrentHandRank >= HandRankType.Straight)
                 {
                     return PlayerAction.Raise((context.CurrentPot * 2) - MagicNumber);
                 }
@@ -386,7 +374,7 @@
             {
                 outs = this.DoIt(this.hand, HandRankType.ThreeOfAKind);
             }
-            else if (this.currentHandRank < HandRankType.Straight)
+            else if (this.CurrentHandRank < HandRankType.Straight)
             {
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
@@ -430,7 +418,25 @@
 
         private PlayerAction PreflopLogic(GetTurnContext context)
         {
-            // to rework ... or not
+            this.ownCardsStrength = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
+
+            if (context.SmallBlind == 1)
+            {
+                if (!this.isAlwaysAllIn && context.CurrentPot + context.MoneyLeft == 2000)
+                {
+                    this.allInCount++;
+                    if (this.allInCount > MagicNumber)
+                    {
+                        this.isAlwaysAllIn = true;
+                    }
+
+                    if (this.ownCardsStrength < CardValuationType.Strong)
+                    {
+                        return PlayerAction.Fold();
+                    }
+                }
+            }
+
             // handling AlwaysAllIn Player
             if (this.isAlwaysAllIn && context.CurrentPot + context.MoneyLeft == 2000)
             {
@@ -453,8 +459,6 @@
 
                 return PlayerAction.Fold();
             }
-
-            this.ownCardsStrength = PreflopHandStrengthValuation.GetRecommendation(this.FirstCard, this.SecondCard);
 
             if (context.MoneyLeft <= context.SmallBlind * 10 /*&& ownCardsStrength > CardValuationType.Unplayable*/)
             {
@@ -505,12 +509,6 @@
 
                 if (this.ownCardsStrength == CardValuationType.NotRecommended)
                 {
-                    // drops 70-80 - not good
-                    //if (isAlwaysRaise)
-                    //{
-                    //    return PlayerAction.Fold();
-                    //}
-
                     if (isCallingStation)
                     {
                         return PlayerAction.CheckOrCall();
