@@ -204,7 +204,7 @@
                 this.lastAction == PlayerActionType.Raise
                 && context.MoneyToCall <= ((context.CurrentPot / 2) + 1))
             {
-                if (this.FirstCard.Type >= CardType.Queen || this.SecondCard.Type >= CardType.Queen)
+                if (this.FirstCard.Type >= CardType.King || this.SecondCard.Type >= CardType.King)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -215,9 +215,9 @@
                 }
             }
 
-            if (this.lastAction == PlayerActionType.CheckCall && !isCallingStation)
+            if (this.lastAction < PlayerActionType.Raise && !isCallingStation && !this.isAlwaysRaise)
             {
-                return PlayerAction.Raise((context.CurrentPot / 2) + MagicNumber);
+                return PlayerAction.Raise((context.CurrentPot / 3) + MagicNumber);
             }
 
             // TODO: add handrank
@@ -293,18 +293,23 @@
                 return PlayerAction.CheckOrCall();
             }
 
+            if (this.lastAction < PlayerActionType.Raise && !isCallingStation && !this.isAlwaysRaise)
+            {
+                return PlayerAction.Raise((context.CurrentPot / 3) + MagicNumber);
+            }
+
             if (this.CurrentHandRank < HandRankType.Straight)
             {
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
-            if (outs > 11)
+            if (outs > 10)
             {
                 if (this.lastAction == PlayerActionType.Raise)
                 {
-                    if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2)
+                    if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2 + 5)
                     {
-                        if (isVeryAggressive)
+                        if (isVeryAggressive && !this.isAlwaysRaise)
                         {
                             return PlayerAction.Raise(AllIn(context.MoneyLeft));
                         }
@@ -324,7 +329,7 @@
                 return PlayerAction.CheckOrCall();
             }
 
-            if (outs < 8)
+            if (outs <= 10)
             {
                 if (this.lastAction == PlayerActionType.Raise && context.MoneyToCall * 100 / context.CurrentPot > outs * 2)
                 {
@@ -355,6 +360,11 @@
                 }
             }
 
+            if (this.lastAction < PlayerActionType.Raise && !isCallingStation && !this.isAlwaysRaise)
+            {
+                return PlayerAction.Raise((context.CurrentPot / 3) + MagicNumber);
+            }
+
             if (this.CurrentHandRank > HandRankType.TwoPairs)
             {
                 if (this.lastAction < PlayerActionType.Raise)
@@ -379,17 +389,29 @@
                 outs = this.DoIt(this.hand, HandRankType.Straight);
             }
 
-            if (this.lastAction == PlayerActionType.Raise)
+            if (this.lastAction == PlayerActionType.Raise && isVeryAggressive && !this.isAlwaysRaise)
             {
-                if (outs >= 8)
+                if (outs >= 9)
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
             }
 
+            if (this.lastAction < PlayerActionType.Raise && !isCallingStation && !this.isAlwaysRaise)
+            {
+                return PlayerAction.Raise((context.CurrentPot / 3) + MagicNumber);
+            }
+
             if (outs > 11)
             {
-                return PlayerAction.Raise(context.CurrentPot + MagicNumber);
+                if (this.lastAction < PlayerActionType.Raise)
+                {
+                    return PlayerAction.Raise(context.CurrentPot * 2 / 3 + MagicNumber);
+                }
+                else
+                {
+                    return PlayerAction.CheckOrCall();
+                }
             }
 
             if (outs > 8)
