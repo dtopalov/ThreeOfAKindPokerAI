@@ -18,11 +18,12 @@
         private const int MagicNumber = 3;
 
         private static bool isSmallBlind;
-        private static int outs;
         private static bool flag;
         private static bool smallBlindFlag;
         private static bool isCallingStation;
         private static bool isVeryAggressive;
+
+
 
         private readonly IHandEvaluator handEvaluator = new HandEvaluator();
         private readonly ICollection<PlayerActionType> opponentActions = new List<PlayerActionType>();
@@ -37,6 +38,9 @@
         private CardValuationType ownCardsStrength = 0;
         private BestHand currentBestHand;
         private ICollection<Card> hand;
+        private ICollection<Card> outs = new List<Card>();
+
+
 
         public override string Name { get; } = "AlwaysCallDummyPlayer_" + Guid.NewGuid();
 
@@ -44,16 +48,21 @@
 
         public override PlayerAction GetTurn(GetTurnContext context)
         {
+            // antiCrash prefix - do not delete
+            if (context.MoneyLeft <= 0)
+            {
+                return PlayerAction.CheckOrCall();
+            }
+
             if (!smallBlindFlag && context.RoundType == GameRoundType.PreFlop)
             {
                 smallBlindFlag = true;
                 isSmallBlind = context.MyMoneyInTheRound == context.SmallBlind;
             }
 
-            // antiCrash prefix - do not delete
-            if (context.MoneyLeft <= 0)
+            if (context.RoundType == GameRoundType.PreFlop)
             {
-                return PlayerAction.CheckOrCall();
+                this.outs.Clear();
             }
 
             this.lastAction = context.PreviousRoundActions.Any() ?
@@ -69,7 +78,8 @@
                 }
             }
 
-            if (this.opponentActions.Any() && (!flag && context.SmallBlind == 2) || (flag && context.SmallBlind == 10))
+            if (this.opponentActions.Any() && (!flag && context.SmallBlind == 2) ||
+                (flag && context.SmallBlind == 10))
             {
                 flag = true;
                 isCallingStation = this.FindCallingStation(this.opponentActions);
@@ -110,13 +120,18 @@
                     return PlayerAction.CheckOrCall();
                 }
 
-                if (this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
+                if (context.RoundType == GameRoundType.River && this.CurrentHandRank >= HandRankType.Straight && this.CommunityImproved())
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
 
+                if (context.RoundType == GameRoundType.Flop || context.RoundType == GameRoundType.Flop)
+                {
+                    this.DoIt(this.hand, HandRankType.Straight);
+                }
+
                 if (this.ownCardsStrength >= CardValuationType.Strong
-                    && this.DoIt(this.hand, HandRankType.Straight) < 4
+                    && this.outs.Count < 5
                     && this.handEvaluator.GetBestHand(this.CommunityCards).RankType < HandRankType.Pair
                     && this.CurrentHandRank >= HandRankType.TwoPairs)
                 {
@@ -172,12 +187,11 @@
         }
 
         // renamed while explosions on testing server to aviod exploition
-        private int DoIt(ICollection<Card> currentHand, HandRankType target)
+        private void DoIt(ICollection<Card> currentHand, HandRankType target)
         {
-            var outCount = 0;
             foreach (var card in Deck.AllCards)
             {
-                if (currentHand.Contains(card))
+                if (currentHand.Contains(card) || this.outs.Contains(card))
                 {
                     continue;
                 }
@@ -186,13 +200,11 @@
 
                 if (this.handEvaluator.GetBestHand(currentHand).RankType >= target)
                 {
-                    outCount++;
+                    this.outs.Add(card);
                 }
 
                 currentHand.Remove(card);
             }
-
-            return outCount;
         }
 
         private PlayerAction RiverLogic(GetTurnContext context)
@@ -255,7 +267,7 @@
         private bool FindCallingStation(ICollection<PlayerActionType> actions)
         {
             int calls = actions.Count(x => x == PlayerActionType.CheckCall);
-            if ((calls * 100 / actions.Count) > 65)
+            if (actions.Any() && (calls * 100 / actions.Count) > 65)
             {
                 return true;
             }
@@ -266,7 +278,7 @@
         private bool FindAggressiveStation(ICollection<PlayerActionType> actions)
         {
             int raises = actions.Count(x => x == PlayerActionType.Raise);
-            if (raises * 100 / actions.Count > 70)
+            if (actions.Any() && raises * 100 / actions.Count > 70)
             {
                 return true;
             }
@@ -303,14 +315,14 @@
 
             if (this.CurrentHandRank < HandRankType.Straight)
             {
-                outs = this.DoIt(this.hand, HandRankType.Straight);
+                this.DoIt(this.hand, HandRankType.Straight);
             }
 
-            if (outs > 10)
+            if (this.outs.Count > 10)
             {
                 if (this.lastAction == PlayerActionType.Raise)
                 {
-                    if (context.MoneyToCall * 100 / context.CurrentPot < outs * 2 + 5)
+                    if (context.MoneyToCall * 100 / context.CurrentPot < (this.outs.Count * 2) + 5)
                     {
                         if (isVeryAggressive && !this.isAlwaysRaise)
                         {
@@ -332,9 +344,10 @@
                 return PlayerAction.CheckOrCall();
             }
 
-            if (outs <= 10)
+            if (this.outs.Count <= 10)
             {
-                if (this.lastAction == PlayerActionType.Raise && context.MoneyToCall * 100 / context.CurrentPot > outs * 2)
+                if (this.lastAction == PlayerActionType.Raise &&
+                    context.MoneyToCall * 100 / context.CurrentPot > this.outs.Count * 2)
                 {
                     return PlayerAction.Fold();
                 }
@@ -385,16 +398,17 @@
 
             if (this.FirstCard.Type == this.SecondCard.Type)
             {
-                outs = this.DoIt(this.hand, HandRankType.ThreeOfAKind);
+                this.DoIt(this.hand, HandRankType.ThreeOfAKind);
             }
-            else if (this.CurrentHandRank < HandRankType.Straight)
+            else if (this.CurrentHandRank < HandRankType.Straight &&
+                this.FirstCard.Type != this.SecondCard.Type)
             {
-                outs = this.DoIt(this.hand, HandRankType.Straight);
+                this.DoIt(this.hand, HandRankType.Straight);
             }
 
             if (this.lastAction == PlayerActionType.Raise && isVeryAggressive && !this.isAlwaysRaise)
             {
-                if (outs >= 9)
+                if (this.outs.Count >= 9)
                 {
                     return PlayerAction.Raise(AllIn(context.MoneyLeft));
                 }
@@ -405,7 +419,7 @@
                 return PlayerAction.Raise((context.CurrentPot / 3) + MagicNumber);
             }
 
-            if (outs > 11)
+            if (this.outs.Count > 11)
             {
                 if (this.lastAction < PlayerActionType.Raise)
                 {
@@ -417,10 +431,10 @@
                 }
             }
 
-            if (outs > 8)
+            if (this.outs.Count > 8)
             {
                 if (this.lastAction < PlayerActionType.Raise &&
-                    context.MoneyToCall * 100 / context.CurrentPot < outs * 5)
+                    context.MoneyToCall * 100 / context.CurrentPot < this.outs.Count * 5)
                 {
                     return PlayerAction.CheckOrCall();
                 }
@@ -428,7 +442,7 @@
                 return PlayerAction.Raise((context.CurrentPot * 2 / 3) - MagicNumber);
             }
 
-            if (outs < 6)
+            if (this.outs.Count < 6)
             {
                 if (this.lastAction == PlayerActionType.Raise)
                 {
