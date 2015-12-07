@@ -11,11 +11,10 @@
         {
             var suitedCards = cards.Select(c => c.Suit)
                                    .GroupBy(c => c)
-                                   .OrderByDescending(g => g)
-                                   .FirstOrDefault()
-                                   .Count();
+                                   .OrderByDescending(g => g.Count())
+                                   .FirstOrDefault();
 
-            switch (suitedCards)
+            switch (suitedCards.Count())
             {
                 // case 4 - flush is on - handle elsewhere
                 case 4:
